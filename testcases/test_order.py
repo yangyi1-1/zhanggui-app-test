@@ -61,17 +61,17 @@ class TestOrder:
     @pytest.mark.smoke
     def test_get_order_detail(self, order_api):
         """测试获取订单详情"""
-        # 先获取列表取第一个订单
         response = order_api.get_order_list(params={"pageSize": 1})
         data = response.json()
-        if len(data["list"]) > 0:
-            order_id = data["list"][0]["id"]
-            response = order_api.get_order_detail(order_id)
-            assert_status_code(response, 200)
-            detail = response.json()
-            assert_response_has_fields(detail["data"], [
-                "id", "orderNo", "status", "totalAmount", "items", "createTime"
-            ])
+        if len(data["list"]) == 0:
+            pytest.skip("没有可用的订单数据")
+        order_id = data["list"][0]["id"]
+        response = order_api.get_order_detail(order_id)
+        assert_status_code(response, 200)
+        detail = response.json()
+        assert_response_has_fields(detail["data"], [
+            "id", "orderNo", "status", "totalAmount", "items", "createTime"
+        ])
 
     def test_get_nonexistent_order(self, order_api):
         """测试获取不存在的订单"""
@@ -84,16 +84,17 @@ class TestOrder:
         """测试获取订单商品明细"""
         response = order_api.get_order_list(params={"pageSize": 1})
         data = response.json()
-        if len(data["list"]) > 0:
-            order_id = data["list"][0]["id"]
-            response = order_api.get_order_items(order_id)
-            assert_status_code(response, 200)
-            items = response.json()["data"]
-            assert isinstance(items, list)
-            if len(items) > 0:
-                assert_response_has_fields(items[0], [
-                    "productName", "quantity", "price", "subtotal"
-                ])
+        if len(data["list"]) == 0:
+            pytest.skip("没有可用的订单数据")
+        order_id = data["list"][0]["id"]
+        response = order_api.get_order_items(order_id)
+        assert_status_code(response, 200)
+        items = response.json()["data"]
+        assert isinstance(items, list)
+        if len(items) > 0:
+            assert_response_has_fields(items[0], [
+                "productName", "quantity", "price", "subtotal"
+            ])
 
     # ========== 订单状态流转 ==========
 
@@ -102,30 +103,33 @@ class TestOrder:
         """测试订单确认"""
         response = order_api.get_order_list(params={"status": "pending", "pageSize": 1})
         data = response.json()
-        if len(data["list"]) > 0:
-            order_id = data["list"][0]["id"]
-            response = order_api.confirm_order(order_id)
-            assert_status_code(response, 200)
+        if len(data["list"]) == 0:
+            pytest.skip("没有待确认的订单")
+        order_id = data["list"][0]["id"]
+        response = order_api.confirm_order(order_id)
+        assert_status_code(response, 200)
 
     @pytest.mark.regression
     def test_order_status_flow_complete(self, order_api):
         """测试订单完成"""
         response = order_api.get_order_list(params={"status": "confirmed", "pageSize": 1})
         data = response.json()
-        if len(data["list"]) > 0:
-            order_id = data["list"][0]["id"]
-            response = order_api.complete_order(order_id)
-            assert_status_code(response, 200)
+        if len(data["list"]) == 0:
+            pytest.skip("没有已确认的订单")
+        order_id = data["list"][0]["id"]
+        response = order_api.complete_order(order_id)
+        assert_status_code(response, 200)
 
     @pytest.mark.regression
     def test_order_cancel(self, order_api):
         """测试取消订单"""
         response = order_api.get_order_list(params={"status": "pending", "pageSize": 1})
         data = response.json()
-        if len(data["list"]) > 0:
-            order_id = data["list"][0]["id"]
-            response = order_api.cancel_order(order_id, "用户主动取消")
-            assert_status_code(response, 200)
+        if len(data["list"]) == 0:
+            pytest.skip("没有待确认的订单")
+        order_id = data["list"][0]["id"]
+        response = order_api.cancel_order(order_id, "用户主动取消")
+        assert_status_code(response, 200)
 
     # ========== 订单退款 ==========
 
@@ -134,11 +138,12 @@ class TestOrder:
         """测试订单退款"""
         response = order_api.get_order_list(params={"status": "completed", "pageSize": 1})
         data = response.json()
-        if len(data["list"]) > 0:
-            order_id = data["list"][0]["id"]
-            refund_data = test_data["order"]["refund"]
-            response = order_api.refund_order(order_id, refund_data)
-            assert_status_code(response, 200)
+        if len(data["list"]) == 0:
+            pytest.skip("没有已完成的订单")
+        order_id = data["list"][0]["id"]
+        refund_data = test_data["order"]["refund"]
+        response = order_api.refund_order(order_id, refund_data)
+        assert_status_code(response, 200)
 
     # ========== 边界测试 ==========
 

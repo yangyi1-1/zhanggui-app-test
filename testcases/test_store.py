@@ -25,7 +25,7 @@ class TestStore:
         assert_status_code(response, 200)
         data = response.json()
         assert_pagination(data)
-        assert len(data["list"]) > 0
+        assert len(data["list"]) > 0, "门店列表不应为空"
 
     def test_get_store_list_with_pagination(self, store_api):
         """测试门店列表分页"""

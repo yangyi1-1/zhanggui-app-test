@@ -78,6 +78,8 @@ class TestAuth:
         self.api.set_token(admin_token)
         response = self.api.refresh_token()
         assert_status_code(response, 200)
+        data = response.json()
+        assert_response_has_fields(data["data"], ["token"])
 
     # ========== 登出测试 ==========
 

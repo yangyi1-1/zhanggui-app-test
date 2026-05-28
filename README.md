@@ -13,6 +13,7 @@
 | pytest-html | 测试报告 |
 | pytest-ordering | 用例执行顺序控制 |
 | Faker | 测试数据生成 |
+| python-dotenv | 环境变量管理 |
 
 ## 项目结构
 
@@ -21,7 +22,7 @@ zhanggui-app-test/
 ├── config/
 │   └── config.py          # 环境配置（多环境支持、测试账号、门店配置）
 ├── api/
-│   ├── client.py          # API客户端基类（统一请求、Token管理）
+│   ├── client.py          # API客户端基类（统一请求、Token管理、重试机制）
 │   ├── auth_api.py        # 认证模块API（登录/登出/Token刷新）
 │   ├── store_api.py       # 门店模块API（CRUD、状态管理、统计）
 │   ├── product_api.py     # 商品模块API（分类、商品、上下架）
@@ -37,6 +38,8 @@ zhanggui-app-test/
 │   └── test_member.py     # 会员模块测试（15个用例）
 ├── data/
 │   └── test_data.yaml     # 数据驱动测试数据
+├── fixtures/
+│   └── common.py          # 通用测试fixtures
 ├── utils/
 │   ├── logger.py          # 日志工具
 │   ├── assertions.py      # 自定义断言
@@ -44,8 +47,50 @@ zhanggui-app-test/
 ├── conftest.py            # pytest全局fixture
 ├── pytest.ini             # pytest配置
 ├── requirements.txt       # 依赖管理
+├── .env.example           # 环境变量模板
 └── README.md
 ```
+
+## 快速开始
+
+### 1. 安装依赖
+
+```bash
+pip install -r requirements.txt
+```
+
+### 2. 配置环境变量
+
+```bash
+cp .env.example .env
+# 编辑 .env 文件，填入测试环境的账号密码
+```
+
+### 3. 运行测试
+
+```bash
+# 运行全部测试
+pytest
+
+# 运行指定模块
+pytest testcases/test_order.py -v
+
+# 运行冒烟测试
+pytest -m smoke -v
+
+# 运行回归测试
+pytest -m regression -v
+
+# 运行指定模块标记
+pytest -m order -v
+
+# 生成HTML报告
+pytest --html=reports/report.html --self-contained-html
+```
+
+### 4. 查看报告
+
+运行后在 `reports/` 目录下生成HTML报告。
 
 ## 业务覆盖
 
@@ -84,40 +129,6 @@ zhanggui-app-test/
 - 会员积分查询
 - 会员搜索
 
-## 快速开始
-
-### 1. 安装依赖
-
-```bash
-pip install -r requirements.txt
-```
-
-### 2. 运行测试
-
-```bash
-# 运行全部测试
-pytest
-
-# 运行指定模块
-pytest testcases/test_order.py -v
-
-# 运行冒烟测试
-pytest -m smoke -v
-
-# 运行回归测试
-pytest -m regression -v
-
-# 运行指定模块标记
-pytest -m order -v
-
-# 生成HTML报告
-pytest --html=reports/report.html --self-contained-html
-```
-
-### 3. 查看报告
-
-运行后在 `reports/` 目录下生成HTML报告。
-
 ## 测试用例统计
 
 | 模块 | 用例数 | 覆盖范围 |
@@ -133,12 +144,14 @@ pytest --html=reports/report.html --self-contained-html
 ## 核心设计亮点
 
 1. **分层架构**: API封装层 / 测试用例层 / 数据层 / 工具层，职责清晰
-2. **API客户端基类**: 统一请求处理、Token管理、日志记录
+2. **API客户端基类**: 统一请求处理、Token管理、日志记录、自动重试
 3. **多环境支持**: test/staging/prod环境一键切换
-4. **数据驱动**: YAML + pytest.mark.parametrize，覆盖多组业务数据
-5. **Session级Fixture**: Token和API客户端复用，提升执行效率
-6. **业务场景覆盖**: 不仅测试CRUD，还测试状态流转、异常处理、边界条件
-7. **自定义断言**: 封装业务断言（分页结构、状态码、字段校验）
+4. **环境变量管理**: 敏感配置通过 .env 文件管理，安全可控
+5. **数据驱动**: YAML + pytest.mark.parametrize，覆盖多组业务数据
+6. **Session级Fixture**: Token和API客户端复用，提升执行效率
+7. **业务场景覆盖**: 不仅测试CRUD，还测试状态流转、异常处理、边界条件
+8. **自定义断言**: 封装业务断言（分页结构、状态码、字段校验）
+9. **智能跳过**: 数据不足时用 pytest.skip() 明确标记，避免静默失败
 
 ## 项目背景
 

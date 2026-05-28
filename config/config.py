@@ -1,7 +1,9 @@
 """掌柜APP项目配置"""
 
+import os
+
 # ========== 环境配置 ==========
-ENV = "test"
+ENV = os.getenv("TEST_ENV", "test")
 
 # 各环境URL
 ENV_CONFIG = {
@@ -20,10 +22,10 @@ ENV_CONFIG = {
 }
 
 # 当前环境配置
-BASE_URL = ENV_CONFIG[ENV]["base_url"]
+BASE_URL = os.getenv("BASE_URL", ENV_CONFIG[ENV]["base_url"])
 
 # ========== 请求配置 ==========
-TIMEOUT = 15
+TIMEOUT = int(os.getenv("TIMEOUT", "15"))
 
 HEADERS = {
     "Content-Type": "application/json",
@@ -35,22 +37,22 @@ HEADERS = {
 # ========== 测试账号 ==========
 TEST_ACCOUNTS = {
     "admin": {
-        "phone": "13800000001",
-        "password": "test123456",
+        "phone": os.getenv("TEST_ADMIN_PHONE", "13800000001"),
+        "password": os.getenv("TEST_ADMIN_PASSWORD", "test123456"),
         "role": "admin",
     },
     "manager": {
-        "phone": "13800000002",
-        "password": "test123456",
+        "phone": os.getenv("TEST_MANAGER_PHONE", "13800000002"),
+        "password": os.getenv("TEST_MANAGER_PASSWORD", "test123456"),
         "role": "store_manager",
     },
     "cashier": {
-        "phone": "13800000003",
-        "password": "test123456",
+        "phone": os.getenv("TEST_CASHIER_PHONE", "13800000003"),
+        "password": os.getenv("TEST_CASHIER_PASSWORD", "test123456"),
         "role": "cashier",
     },
 }
 
 # ========== 门店配置 ==========
-TEST_STORE_ID = "STORE_001"
-TEST_MERCHANT_ID = "MERCHANT_001"
+TEST_STORE_ID = os.getenv("TEST_STORE_ID", "STORE_001")
+TEST_MERCHANT_ID = os.getenv("TEST_MERCHANT_ID", "MERCHANT_001")

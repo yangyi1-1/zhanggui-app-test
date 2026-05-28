@@ -42,7 +42,7 @@ class TestMember:
     @pytest.mark.smoke
     def test_create_member(self, member_api, test_data):
         """测试注册会员"""
-        member_data = test_data["member"]["create"][0]
+        member_data = test_data["member"]["create"][0].copy()
         member_data["phone"] = generate_phone()  # 避免重复
         response = member_api.create_member(member_data)
         assert_status_code(response, 200)
@@ -51,9 +51,10 @@ class TestMember:
 
     def test_create_duplicate_phone_member(self, member_api, test_data):
         """测试重复手机号注册"""
-        member_data = test_data["member"]["create"][0]
+        member_data = test_data["member"]["create"][0].copy()
+        phone = generate_phone()
+        member_data["phone"] = phone
         # 第一次注册
-        member_data["phone"] = generate_phone()
         member_api.create_member(member_data)
         # 第二次注册相同手机号
         response = member_api.create_member(member_data)
@@ -65,17 +66,17 @@ class TestMember:
     @pytest.mark.smoke
     def test_get_member_detail(self, member_api):
         """测试获取会员详情"""
-        # 先获取列表取第一个
         response = member_api.get_member_list(params={"pageSize": 1})
         data = response.json()
-        if len(data["list"]) > 0:
-            member_id = data["list"][0]["id"]
-            response = member_api.get_member_detail(member_id)
-            assert_status_code(response, 200)
-            detail = response.json()
-            assert_response_has_fields(detail["data"], [
-                "id", "name", "phone", "balance", "points", "level"
-            ])
+        if len(data["list"]) == 0:
+            pytest.skip("没有可用的会员数据")
+        member_id = data["list"][0]["id"]
+        response = member_api.get_member_detail(member_id)
+        assert_status_code(response, 200)
+        detail = response.json()
+        assert_response_has_fields(detail["data"], [
+            "id", "name", "phone", "balance", "points", "level"
+        ])
 
     def test_get_nonexistent_member(self, member_api):
         """测试获取不存在的会员"""
@@ -87,13 +88,12 @@ class TestMember:
     @pytest.mark.regression
     def test_update_member(self, member_api, test_data):
         """测试更新会员信息"""
-        # 创建会员
-        member_data = test_data["member"]["create"][0]
+        member_data = test_data["member"]["create"][0].copy()
         member_data["phone"] = generate_phone()
         create_resp = member_api.create_member(member_data)
+        assert_status_code(create_resp, 200)
         member_id = create_resp.json()["data"]["id"]
 
-        # 更新
         response = member_api.update_member(member_id, {"name": "更新后的名字"})
         assert_status_code(response, 200)
 
@@ -103,13 +103,14 @@ class TestMember:
         """测试查询会员余额"""
         response = member_api.get_member_list(params={"pageSize": 1})
         data = response.json()
-        if len(data["list"]) > 0:
-            member_id = data["list"][0]["id"]
-            response = member_api.get_member_balance(member_id)
-            assert_status_code(response, 200)
-            balance_data = response.json()["data"]
-            assert "balance" in balance_data
-            assert isinstance(balance_data["balance"], (int, float))
+        if len(data["list"]) == 0:
+            pytest.skip("没有可用的会员数据")
+        member_id = data["list"][0]["id"]
+        response = member_api.get_member_balance(member_id)
+        assert_status_code(response, 200)
+        balance_data = response.json()["data"]
+        assert "balance" in balance_data
+        assert isinstance(balance_data["balance"], (int, float))
 
     @pytest.mark.parametrize("amount,expected_bonus", [
         (100.00, 10.00),
@@ -120,12 +121,13 @@ class TestMember:
         """参数化测试：会员充值（不同档位赠送）"""
         response = member_api.get_member_list(params={"pageSize": 1})
         data = response.json()
-        if len(data["list"]) > 0:
-            member_id = data["list"][0]["id"]
-            response = member_api.recharge(member_id, amount)
-            assert_status_code(response, 200)
-            recharge_data = response.json()["data"]
-            assert recharge_data["amount"] == amount
+        if len(data["list"]) == 0:
+            pytest.skip("没有可用的会员数据")
+        member_id = data["list"][0]["id"]
+        response = member_api.recharge(member_id, amount)
+        assert_status_code(response, 200)
+        recharge_data = response.json()["data"]
+        assert recharge_data["amount"] == amount
 
     # ========== 会员积分 ==========
 
@@ -133,12 +135,13 @@ class TestMember:
         """测试查询会员积分"""
         response = member_api.get_member_list(params={"pageSize": 1})
         data = response.json()
-        if len(data["list"]) > 0:
-            member_id = data["list"][0]["id"]
-            response = member_api.get_member_points(member_id)
-            assert_status_code(response, 200)
-            points_data = response.json()["data"]
-            assert "points" in points_data
+        if len(data["list"]) == 0:
+            pytest.skip("没有可用的会员数据")
+        member_id = data["list"][0]["id"]
+        response = member_api.get_member_points(member_id)
+        assert_status_code(response, 200)
+        points_data = response.json()["data"]
+        assert "points" in points_data
 
     # ========== 会员搜索 ==========
 

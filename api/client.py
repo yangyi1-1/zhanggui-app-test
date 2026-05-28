@@ -4,6 +4,8 @@
 """
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from config.config import BASE_URL, TIMEOUT, HEADERS
 from utils.logger import logger
 
@@ -16,6 +18,15 @@ class APIClient:
         self.session = requests.Session()
         self.session.headers.update(HEADERS)
         self.token = None
+
+        # 配置重试策略
+        retry = Retry(
+            total=3,
+            backoff_factor=0.5,
+            status_forcelist=[500, 502, 503, 504],
+        )
+        self.session.mount("http://", HTTPAdapter(max_retries=retry))
+        self.session.mount("https://", HTTPAdapter(max_retries=retry))
 
     def set_token(self, token):
         """设置认证Token"""
@@ -41,6 +52,10 @@ class APIClient:
 
         logger.info(f"Status: {response.status_code}")
         logger.info(f"Response: {response.text[:500]}")
+
+        # 检查 Token 过期
+        if response.status_code == 401:
+            logger.warning("Token 已过期，请重新登录获取新 Token")
 
         return response
 

@@ -10,7 +10,7 @@
 """
 
 import pytest
-from utils.assertions import assert_status_code, assert_response_has_fields
+from utils.assertions import assert_status_code, assert_response_has_fields, assert_pagination
 from utils.helpers import get_current_date
 
 
@@ -24,7 +24,6 @@ class TestPayment:
     def test_create_payment_wechat(self, payment_api):
         """测试创建微信支付单"""
         response = payment_api.create_payment({
-            "orderId": "ORD_TEST_001",
             "amount": 42.00,
             "payMethod": "wechat",
         })
@@ -36,37 +35,39 @@ class TestPayment:
     def test_create_payment_alipay(self, payment_api):
         """测试创建支付宝支付单"""
         response = payment_api.create_payment({
-            "orderId": "ORD_TEST_002",
             "amount": 30.00,
             "payMethod": "alipay",
         })
         assert_status_code(response, 200)
+        data = response.json()
+        assert_response_has_fields(data["data"], ["paymentId", "amount", "status"])
 
     def test_create_payment_cash(self, payment_api):
         """测试创建现金支付单"""
         response = payment_api.create_payment({
-            "orderId": "ORD_TEST_003",
             "amount": 15.00,
             "payMethod": "cash",
         })
         assert_status_code(response, 200)
+        data = response.json()
+        assert_response_has_fields(data["data"], ["paymentId", "amount", "status"])
 
     def test_create_payment_member_balance(self, payment_api):
         """测试会员余额支付"""
         response = payment_api.create_payment({
-            "orderId": "ORD_TEST_004",
             "amount": 25.00,
             "payMethod": "member_balance",
             "memberId": "MEM_001",
         })
         assert_status_code(response, 200)
+        data = response.json()
+        assert_response_has_fields(data["data"], ["paymentId", "amount", "status"])
 
     # ========== 支付异常 ==========
 
     def test_create_payment_zero_amount(self, payment_api):
         """测试0元支付"""
         response = payment_api.create_payment({
-            "orderId": "ORD_TEST_005",
             "amount": 0,
             "payMethod": "wechat",
         })
@@ -76,7 +77,6 @@ class TestPayment:
     def test_create_payment_negative_amount(self, payment_api):
         """测试负数金额支付"""
         response = payment_api.create_payment({
-            "orderId": "ORD_TEST_006",
             "amount": -10.00,
             "payMethod": "wechat",
         })
@@ -86,7 +86,6 @@ class TestPayment:
     def test_create_payment_invalid_method(self, payment_api):
         """测试无效支付方式"""
         response = payment_api.create_payment({
-            "orderId": "ORD_TEST_007",
             "amount": 10.00,
             "payMethod": "bitcoin",
         })
@@ -100,10 +99,10 @@ class TestPayment:
         """测试查询支付状态"""
         # 先创建支付单
         create_resp = payment_api.create_payment({
-            "orderId": "ORD_TEST_010",
             "amount": 18.00,
             "payMethod": "wechat",
         })
+        assert_status_code(create_resp, 200)
         payment_id = create_resp.json()["data"]["paymentId"]
 
         response = payment_api.get_payment_status(payment_id)
@@ -117,6 +116,8 @@ class TestPayment:
         """测试获取支付记录列表"""
         response = payment_api.get_payment_list()
         assert_status_code(response, 200)
+        data = response.json()
+        assert_pagination(data)
 
     def test_get_payment_list_by_date(self, payment_api):
         """测试按日期查询支付记录"""
@@ -131,12 +132,12 @@ class TestPayment:
     @pytest.mark.regression
     def test_refund(self, payment_api):
         """测试退款"""
-        # 先创建并完成一笔支付
+        # 先创建支付单
         create_resp = payment_api.create_payment({
-            "orderId": "ORD_TEST_020",
             "amount": 36.00,
             "payMethod": "wechat",
         })
+        assert_status_code(create_resp, 200)
         payment_id = create_resp.json()["data"]["paymentId"]
 
         response = payment_api.refund(payment_id, 36.00, "顾客要求退款")
@@ -145,10 +146,10 @@ class TestPayment:
     def test_partial_refund(self, payment_api):
         """测试部分退款"""
         create_resp = payment_api.create_payment({
-            "orderId": "ORD_TEST_021",
             "amount": 50.00,
             "payMethod": "wechat",
         })
+        assert_status_code(create_resp, 200)
         payment_id = create_resp.json()["data"]["paymentId"]
 
         response = payment_api.refund(payment_id, 20.00, "部分退款")
@@ -157,10 +158,10 @@ class TestPayment:
     def test_refund_exceed_amount(self, payment_api):
         """测试退款金额超过支付金额"""
         create_resp = payment_api.create_payment({
-            "orderId": "ORD_TEST_022",
             "amount": 10.00,
             "payMethod": "wechat",
         })
+        assert_status_code(create_resp, 200)
         payment_id = create_resp.json()["data"]["paymentId"]
 
         response = payment_api.refund(payment_id, 100.00, "超额退款")

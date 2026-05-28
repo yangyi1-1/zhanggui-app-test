@@ -42,28 +42,45 @@
 ### 2.1 配置层 — config/config.py
 
 ```python
-BASE_URL = "https://test-api.zhanggui.huameng.com"
-TIMEOUT = 15
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+BASE_URL = os.getenv("BASE_URL", "https://test-api.zhanggui.huameng.com")
+TIMEOUT = int(os.getenv("TIMEOUT", "15"))
 TEST_ACCOUNTS = {
-    "admin": {"phone": "13800000001", "password": "test123456"},
+    "admin": {
+        "phone": os.getenv("TEST_ADMIN_PHONE", "13800000001"),
+        "password": os.getenv("TEST_ADMIN_PASSWORD", "test123456"),
+    },
 }
 ```
 
 **为什么要单独抽配置？**
 - 换环境（test/staging/prod）只改配置，不动代码
 - 测试账号、超时时间等集中管理，方便维护
+- 敏感信息通过环境变量管理，安全可控
 
 **面试话术**：
-> "我把所有可变的配置集中到config.py，支持多环境一键切换。改环境只需要改一个变量，不用到处找代码。"
+> "我把所有可变的配置集中到config.py，支持多环境一键切换。敏感信息如账号密码通过环境变量管理，配合.env文件使用，既安全又方便。改环境只需要改一个变量，不用到处找代码。"
 
 ---
 
 ### 2.2 API封装层 — api/client.py（基类）
 
 ```python
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
 class APIClient:
     def __init__(self):
         self.session = requests.Session()  # 复用连接
+
+        # 配置重试策略
+        retry = Retry(total=3, backoff_factor=0.5, status_forcelist=[500, 502, 503, 504])
+        self.session.mount("http://", HTTPAdapter(max_retries=retry))
+        self.session.mount("https://", HTTPAdapter(max_retries=retry))
 
     def set_token(self, token):
         self.session.headers["Authorization"] = f"Bearer {token}"
@@ -72,6 +89,11 @@ class APIClient:
         url = f"{self.base_url}{path}"
         response = self.session.request(method, url, **kwargs)
         logger.info(f"[{method}] {url}")  # 记录日志
+
+        # 检查 Token 过期
+        if response.status_code == 401:
+            logger.warning("Token 已过期，请重新登录获取新 Token")
+
         return response
 ```
 
@@ -79,9 +101,10 @@ class APIClient:
 - 统一处理请求（Token、日志、超时）
 - 子类只关心接口路径和参数，不重复写请求逻辑
 - 维护方便：改日志格式只改一处
+- 内置重试机制，网络抖动不会导致误报
 
 **面试话术**：
-> "我设计了一个API客户端基类，封装了Token管理、请求发送、日志记录。所有业务API继承它，只写自己接口的路径和参数。这样代码复用率高，维护也方便。"
+> "我设计了一个API客户端基类，封装了Token管理、请求发送、日志记录和自动重试。重试策略是3次，指数退避，针对5xx错误。所有业务API继承它，只写自己接口的路径和参数。这样代码复用率高，维护也方便，网络抖动不会导致测试误报。"
 
 ---
 
@@ -323,10 +346,10 @@ def test_recharge(self, amount, expected_bonus):
 **回答**：
 > "有几个方向可以优化：
 > 1. **加Mock能力**：对第三方支付接口做Mock，不依赖真实环境
-> 2. **加数据驱动升级**：用conftest的fixture动态加载YAML数据，不用硬编码
-> 3. **加Allure报告**：比pytest-html更美观，支持截图、附件、步骤记录
-> 4. **加CI/CD集成**：配置GitHub Actions或Jenkins，代码提交自动跑测试
-> 5. **加性能测试**：用locust对核心接口做并发压测"
+> 2. **加Allure报告**：比pytest-html更美观，支持截图、附件、步骤记录
+> 3. **加CI/CD集成**：配置GitHub Actions或Jenkins，代码提交自动跑测试
+> 4. **加性能测试**：用locust对核心接口做并发压测
+> 5. **加数据清理**：测试后自动清理创建的测试数据，保证环境干净"
 
 ---
 
@@ -350,7 +373,21 @@ def test_recharge(self, amount, expected_bonus):
 
 ---
 
-### Q10: 参数化测试有什么好处？举个例子？
+### Q10: 为什么要在 API 客户端加自动重试？
+
+**回答**：
+> "接口测试跑在测试环境，网络不稳定是常有的事。如果不加重试，网络抖动会导致测试误报，排查起来很浪费时间。我用 urllib3 的 Retry 配置了3次重试，指数退避（0.5s、1s、2s），只对 5xx 服务端错误重试，4xx 客户端错误不重试。这样既避免了误报，又不会掩盖真正的接口问题。"
+
+---
+
+### Q11: 敏感配置怎么管理的？
+
+**回答**：
+> "测试账号、密码这些敏感信息不能硬编码在代码里，我用环境变量管理。本地开发用 .env 文件，CI/CD 里用系统环境变量。config.py 里用 os.getenv() 读取，有默认值兜底。.env 文件加到 .gitignore，不提交到代码库。这样既安全又方便，不同环境可以用不同的配置。"
+
+---
+
+### Q12: 参数化测试有什么好处？举个例子？
 
 **回答**：
 > "参数化的好处是用同一段代码覆盖多组数据，减少重复代码。比如会员充值测试，我用参数化覆盖100元送10元、200元送30元、500元送100元三个档位：

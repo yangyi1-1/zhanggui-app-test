@@ -73,9 +73,11 @@ class TestProduct:
     @pytest.mark.smoke
     def test_get_product_detail(self, product_api):
         """测试获取商品详情"""
-        # 先获取列表取第一个商品ID
         response = product_api.get_product_list(params={"pageSize": 1})
-        product_id = response.json()["list"][0]["id"]
+        data = response.json()
+        if len(data["list"]) == 0:
+            pytest.skip("没有可用的商品数据")
+        product_id = data["list"][0]["id"]
 
         response = product_api.get_product_detail(product_id)
         assert_status_code(response, 200)
@@ -94,11 +96,12 @@ class TestProduct:
     @pytest.mark.regression
     def test_product_on_off_shelf(self, product_api, test_data):
         """测试商品上下架"""
-        product_data = test_data["product"]["create"][0]
+        product_data = test_data["product"]["create"][0].copy()
         product_data["storeId"] = "STORE_001"
 
         # 创建商品
         response = product_api.create_product(product_data)
+        assert_status_code(response, 200)
         product_id = response.json()["data"]["id"]
 
         # 下架
@@ -117,7 +120,7 @@ class TestProduct:
     @pytest.mark.regression
     def test_product_crud(self, product_api, test_data):
         """测试商品完整CRUD流程"""
-        product_data = test_data["product"]["create"][1]
+        product_data = test_data["product"]["create"][1].copy()
         product_data["storeId"] = "STORE_001"
 
         # 创建
@@ -144,9 +147,10 @@ class TestProduct:
         """测试批量操作商品"""
         # 获取商品列表
         response = product_api.get_product_list(params={"pageSize": 3})
-        products = response.json()["list"]
-        product_ids = [p["id"] for p in products]
+        data = response.json()
+        if len(data["list"]) == 0:
+            pytest.skip("没有可用的商品数据")
+        product_ids = [p["id"] for p in data["list"]]
 
-        if len(product_ids) > 0:
-            response = product_api.batch_update_products(product_ids, "off_shelf")
-            assert_status_code(response, 200)
+        response = product_api.batch_update_products(product_ids, "off_shelf")
+        assert_status_code(response, 200)

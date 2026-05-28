@@ -6,6 +6,7 @@
 import pytest
 import yaml
 import os
+from dotenv import load_dotenv
 from api.auth_api import AuthAPI
 from api.store_api import StoreAPI
 from api.product_api import ProductAPI
@@ -14,6 +15,9 @@ from api.payment_api import PaymentAPI
 from api.member_api import MemberAPI
 from config.config import TEST_ACCOUNTS, TEST_STORE_ID
 from utils.logger import logger
+
+# 加载 .env 文件
+load_dotenv()
 
 
 def pytest_addoption(parser):
