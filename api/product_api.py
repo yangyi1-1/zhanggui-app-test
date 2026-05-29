@@ -54,3 +54,45 @@ class ProductAPI(APIClient):
             "productIds": product_ids,
             "action": action,
         })
+
+    def get_product_stock(self, product_id):
+        """获取商品库存"""
+        return self.get(f"/api/v1/products/{product_id}/stock")
+
+    def update_product_stock(self, product_id, quantity):
+        """更新商品库存"""
+        return self.put(f"/api/v1/products/{product_id}/stock", json={
+            "quantity": quantity
+        })
+
+    def get_product_specs(self, product_id):
+        """获取商品规格"""
+        return self.get(f"/api/v1/products/{product_id}/specs")
+
+    def add_product_spec(self, product_id, data):
+        """添加商品规格"""
+        return self.post(f"/api/v1/products/{product_id}/specs", json=data)
+
+    def get_product_tags(self, product_id):
+        """获取商品标签"""
+        return self.get(f"/api/v1/products/{product_id}/tags")
+
+    def add_product_tag(self, product_id, tag):
+        """添加商品标签"""
+        return self.post(f"/api/v1/products/{product_id}/tags", json={"tag": tag})
+
+    def update_product_sort(self, product_id, sort):
+        """更新商品排序"""
+        return self.put(f"/api/v1/products/{product_id}/sort", json={"sort": sort})
+
+    def upload_product_image(self, product_id, image_data):
+        """上传商品图片"""
+        return self.post(f"/api/v1/products/{product_id}/images", json=image_data)
+
+    def get_product_statistics(self, params=None):
+        """获取商品统计"""
+        return self.get("/api/v1/products/statistics", params=params)
+
+    def search_products(self, keyword):
+        """搜索商品"""
+        return self.get("/api/v1/products/search", params={"keyword": keyword})

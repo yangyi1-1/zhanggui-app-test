@@ -6,6 +6,11 @@
 - 门店创建/更新/删除
 - 门店状态切换
 - 门店统计
+- 门店员工管理
+- 营业时间设置
+- 门店公告
+- 门店权限
+- 数据导出
 """
 
 import pytest
@@ -41,6 +46,12 @@ class TestStore:
         assert_status_code(response, 200)
         data = response.json()
         assert_pagination(data)
+
+    def test_get_store_list_by_status(self, store_api):
+        """测试按状态筛选门店"""
+        for status in ["open", "closed"]:
+            response = store_api.get_store_list(params={"status": status})
+            assert_status_code(response, 200)
 
     # ========== 门店详情 ==========
 
@@ -80,6 +91,124 @@ class TestStore:
         # 恢复营业状态
         store_api.update_store_status(store_id, "open")
 
+    def test_update_store_status_invalid(self, store_api, store_id):
+        """测试无效门店状态"""
+        response = store_api.update_store_status(store_id, "invalid_status")
+        data = response.json()
+        assert data.get("code") != 0, "无效状态应失败"
+
+    # ========== 门店员工管理 ==========
+
+    def test_get_store_employees(self, store_api, store_id):
+        """测试获取门店员工列表"""
+        response = store_api.get_store_employees(store_id)
+        assert_status_code(response, 200)
+        data = response.json()
+        assert isinstance(data["data"], list)
+
+    @pytest.mark.regression
+    def test_add_employee(self, store_api, store_id):
+        """测试添加门店员工"""
+        response = store_api.add_employee(store_id, {
+            "name": "测试员工",
+            "phone": "13800001111",
+            "role": "cashier"
+        })
+        assert_status_code(response, 200)
+
+    @pytest.mark.regression
+    def test_remove_employee(self, store_api, store_id):
+        """测试移除门店员工"""
+        # 先获取员工列表
+        response = store_api.get_store_employees(store_id)
+        data = response.json()
+        if len(data["data"]) == 0:
+            pytest.skip("没有可用的员工数据")
+        employee_id = data["data"][0]["id"]
+        response = store_api.remove_employee(store_id, employee_id)
+        assert_status_code(response, 200)
+
+    # ========== 营业时间 ==========
+
+    def test_update_business_hours(self, store_api, store_id):
+        """测试更新营业时间"""
+        response = store_api.update_business_hours(store_id, {
+            "weekday": "09:00-22:00",
+            "weekend": "10:00-23:00"
+        })
+        assert_status_code(response, 200)
+
+    def test_update_business_hours_invalid(self, store_api, store_id):
+        """测试无效营业时间"""
+        response = store_api.update_business_hours(store_id, {
+            "weekday": "25:00-26:00"  # 无效时间
+        })
+        data = response.json()
+        assert data.get("code") != 0, "无效时间应失败"
+
+    # ========== 门店公告 ==========
+
+    def test_get_store_announcements(self, store_api, store_id):
+        """测试获取门店公告"""
+        response = store_api.get_store_announcements(store_id)
+        assert_status_code(response, 200)
+        data = response.json()
+        assert isinstance(data["data"], list)
+
+    @pytest.mark.regression
+    def test_create_announcement(self, store_api, store_id):
+        """测试创建门店公告"""
+        response = store_api.create_announcement(store_id, {
+            "title": "测试公告",
+            "content": "这是一条测试公告",
+            "type": "notice"
+        })
+        assert_status_code(response, 200)
+
+    def test_create_empty_announcement(self, store_api, store_id):
+        """测试创建空公告"""
+        response = store_api.create_announcement(store_id, {
+            "title": "",
+            "content": ""
+        })
+        data = response.json()
+        assert data.get("code") != 0, "空公告应失败"
+
+    # ========== 门店权限 ==========
+
+    def test_get_store_permissions(self, store_api, store_id):
+        """测试获取门店权限配置"""
+        response = store_api.get_store_permissions(store_id)
+        assert_status_code(response, 200)
+        data = response.json()
+        assert isinstance(data["data"], dict)
+
+    @pytest.mark.regression
+    def test_update_store_permissions(self, store_api, store_id):
+        """测试更新门店权限配置"""
+        response = store_api.update_store_permissions(store_id, {
+            "canModifyPrice": True,
+            "canCancelOrder": True,
+            "canRefund": False
+        })
+        assert_status_code(response, 200)
+
+    # ========== 数据导出 ==========
+
+    def test_export_store_data(self, store_api, store_id):
+        """测试导出门店数据"""
+        response = store_api.export_store_data(store_id)
+        assert_status_code(response, 200)
+
+    def test_export_store_data_by_date(self, store_api, store_id):
+        """测试按日期导出门店数据"""
+        from utils.helpers import get_current_date
+        response = store_api.export_store_data(store_id, params={
+            "startDate": get_current_date(),
+            "endDate": get_current_date()
+        })
+        assert_status_code(response, 200)
+
     # ========== 门店CRUD ==========
 
     @pytest.mark.regression
@@ -107,3 +236,29 @@ class TestStore:
         # 删除
         response = store_api.delete_store(store_id)
         assert_status_code(response, 200)
+
+    def test_create_store_duplicate_name(self, store_api, test_data):
+        """测试重复门店名称"""
+        store_data = test_data["store"]["create"][0]
+        # 第一次创建
+        store_api.create_store(store_data)
+        # 第二次创建相同名称
+        response = store_api.create_store(store_data)
+        # 可能成功或失败，取决于业务规则
+        assert response.status_code in [200, 400]
+
+    def test_create_store_missing_fields(self, store_api):
+        """测试缺少必填字段"""
+        response = store_api.create_store({"name": "测试门店"})
+        data = response.json()
+        assert data.get("code") != 0, "缺少必填字段应失败"
+
+    def test_delete_nonexistent_store(self, store_api):
+        """测试删除不存在的门店"""
+        response = store_api.delete_store("STORE_999")
+        assert_status_code(response, 404)
+
+    def test_update_nonexistent_store(self, store_api):
+        """测试更新不存在的门店"""
+        response = store_api.update_store("STORE_999", {"name": "测试"})
+        assert_status_code(response, 404)

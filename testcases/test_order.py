@@ -7,6 +7,10 @@
 - 订单状态流转（确认→完成、取消）
 - 订单退款
 - 订单商品明细
+- 订单备注
+- 批量操作
+- 订单统计
+- 订单导出
 """
 
 import pytest
@@ -145,6 +149,83 @@ class TestOrder:
         response = order_api.refund_order(order_id, refund_data)
         assert_status_code(response, 200)
 
+    # ========== 订单备注 ==========
+
+    def test_update_order_remark(self, order_api):
+        """测试更新订单备注"""
+        response = order_api.get_order_list(params={"pageSize": 1})
+        data = response.json()
+        if len(data["list"]) == 0:
+            pytest.skip("没有可用的订单数据")
+        order_id = data["list"][0]["id"]
+        response = order_api.update_order_remark(order_id, "测试备注")
+        assert_status_code(response, 200)
+
+    # ========== 批量操作 ==========
+
+    @pytest.mark.regression
+    def test_batch_confirm_orders(self, order_api):
+        """测试批量确认订单"""
+        response = order_api.get_order_list(params={"status": "pending", "pageSize": 3})
+        data = response.json()
+        if len(data["list"]) == 0:
+            pytest.skip("没有待确认的订单")
+        order_ids = [o["id"] for o in data["list"]]
+        response = order_api.batch_confirm_orders(order_ids)
+        assert_status_code(response, 200)
+
+    @pytest.mark.regression
+    def test_batch_cancel_orders(self, order_api):
+        """测试批量取消订单"""
+        response = order_api.get_order_list(params={"status": "pending", "pageSize": 3})
+        data = response.json()
+        if len(data["list"]) == 0:
+            pytest.skip("没有待确认的订单")
+        order_ids = [o["id"] for o in data["list"]]
+        response = order_api.batch_cancel_orders(order_ids, "批量取消测试")
+        assert_status_code(response, 200)
+
+    # ========== 订单统计 ==========
+
+    def test_get_order_statistics(self, order_api):
+        """测试获取订单统计"""
+        response = order_api.get_order_statistics()
+        assert_status_code(response, 200)
+        data = response.json()
+        assert_response_has_fields(data["data"], [
+            "todayOrders", "todayRevenue", "totalOrders", "totalRevenue"
+        ])
+
+    def test_get_order_statistics_by_date(self, order_api):
+        """测试按日期获取订单统计"""
+        from utils.helpers import get_current_date
+        response = order_api.get_order_statistics(params={
+            "startDate": get_current_date(),
+            "endDate": get_current_date(),
+        })
+        assert_status_code(response, 200)
+
+    # ========== 订单导出 ==========
+
+    def test_export_orders(self, order_api):
+        """测试导出订单"""
+        response = order_api.export_orders()
+        assert_status_code(response, 200)
+
+    # ========== 订单操作日志 ==========
+
+    def test_get_order_log(self, order_api):
+        """测试获取订单操作日志"""
+        response = order_api.get_order_list(params={"pageSize": 1})
+        data = response.json()
+        if len(data["list"]) == 0:
+            pytest.skip("没有可用的订单数据")
+        order_id = data["list"][0]["id"]
+        response = order_api.get_order_log(order_id)
+        assert_status_code(response, 200)
+        data = response.json()
+        assert isinstance(data["data"], list)
+
     # ========== 边界测试 ==========
 
     def test_create_order_empty_items(self, order_api):
@@ -161,3 +242,23 @@ class TestOrder:
         })
         data = response.json()
         assert data.get("code") != 0, "数量为0应创建失败"
+
+    def test_create_order_negative_price(self, order_api):
+        """测试创建负价格订单"""
+        response = order_api.create_order({
+            "items": [{"productId": "PROD_001", "quantity": 1, "price": -10.00}],
+            "payMethod": "wechat",
+        })
+        data = response.json()
+        assert data.get("code") != 0, "负价格应创建失败"
+
+    def test_cancel_completed_order(self, order_api):
+        """测试取消已完成的订单"""
+        response = order_api.get_order_list(params={"status": "completed", "pageSize": 1})
+        data = response.json()
+        if len(data["list"]) == 0:
+            pytest.skip("没有已完成的订单")
+        order_id = data["list"][0]["id"]
+        response = order_api.cancel_order(order_id, "测试取消")
+        data = response.json()
+        assert data.get("code") != 0, "已完成订单不能取消"

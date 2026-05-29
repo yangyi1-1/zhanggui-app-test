@@ -39,3 +39,29 @@ class PaymentAPI(APIClient):
             "storeId": store_id,
             "date": date,
         })
+
+    def check_duplicate_payment(self, order_id):
+        """检查重复支付"""
+        return self.get(f"/api/v1/payments/check-duplicate", params={"orderId": order_id})
+
+    def get_payment_statistics(self, params=None):
+        """获取支付统计"""
+        return self.get("/api/v1/payments/statistics", params=params)
+
+    def get_payment_channels(self):
+        """获取支付渠道列表"""
+        return self.get("/api/v1/payments/channels")
+
+    def verify_payment(self, payment_id):
+        """验证支付结果"""
+        return self.post(f"/api/v1/payments/{payment_id}/verify")
+
+    def get_payment_qrcode(self, payment_id):
+        """获取支付二维码"""
+        return self.get(f"/api/v1/payments/{payment_id}/qrcode")
+
+    def close_payment(self, payment_id, reason=None):
+        """关闭支付单"""
+        return self.post(f"/api/v1/payments/{payment_id}/close", json={
+            "reason": reason or "超时关闭"
+        })

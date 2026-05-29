@@ -43,3 +43,30 @@ class OrderAPI(APIClient):
     def search_orders(self, keyword):
         """搜索订单"""
         return self.get("/api/v1/orders/search", params={"keyword": keyword})
+
+    def update_order_remark(self, order_id, remark):
+        """更新订单备注"""
+        return self.put(f"/api/v1/orders/{order_id}/remark", json={"remark": remark})
+
+    def batch_confirm_orders(self, order_ids):
+        """批量确认订单"""
+        return self.post("/api/v1/orders/batch-confirm", json={"orderIds": order_ids})
+
+    def batch_cancel_orders(self, order_ids, reason=None):
+        """批量取消订单"""
+        return self.post("/api/v1/orders/batch-cancel", json={
+            "orderIds": order_ids,
+            "reason": reason or "批量取消"
+        })
+
+    def get_order_statistics(self, params=None):
+        """获取订单统计"""
+        return self.get("/api/v1/orders/statistics", params=params)
+
+    def export_orders(self, params=None):
+        """导出订单"""
+        return self.get("/api/v1/orders/export", params=params)
+
+    def get_order_log(self, order_id):
+        """获取订单操作日志"""
+        return self.get(f"/api/v1/orders/{order_id}/log")

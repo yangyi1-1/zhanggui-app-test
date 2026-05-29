@@ -7,6 +7,11 @@
 - 退款
 - 日结算数据
 - 多支付方式测试
+- 重复支付检查
+- 支付统计
+- 支付渠道
+- 支付验证
+- 支付关闭
 """
 
 import pytest
@@ -127,6 +132,12 @@ class TestPayment:
         })
         assert_status_code(response, 200)
 
+    def test_get_payment_list_by_method(self, payment_api):
+        """测试按支付方式查询支付记录"""
+        for method in ["wechat", "alipay", "cash"]:
+            response = payment_api.get_payment_list(params={"payMethod": method})
+            assert_status_code(response, 200)
+
     # ========== 退款 ==========
 
     @pytest.mark.regression
@@ -168,6 +179,91 @@ class TestPayment:
         data = response.json()
         assert data.get("code") != 0, "超额退款应失败"
 
+    # ========== 退款状态查询 ==========
+
+    def test_get_refund_status(self, payment_api):
+        """测试查询退款状态"""
+        # 先创建支付并退款
+        create_resp = payment_api.create_payment({
+            "amount": 20.00,
+            "payMethod": "wechat",
+        })
+        assert_status_code(create_resp, 200)
+        payment_id = create_resp.json()["data"]["paymentId"]
+
+        refund_resp = payment_api.refund(payment_id, 20.00, "测试退款")
+        assert_status_code(refund_resp, 200)
+        refund_id = refund_resp.json()["data"]["refundId"]
+
+        response = payment_api.get_refund_status(refund_id)
+        assert_status_code(response, 200)
+        data = response.json()
+        assert data["data"]["status"] in ["pending", "success", "failed"]
+
+    # ========== 重复支付检查 ==========
+
+    def test_check_duplicate_payment(self, payment_api):
+        """测试检查重复支付"""
+        response = payment_api.check_duplicate_payment("ORD_TEST_001")
+        assert_status_code(response, 200)
+
+    # ========== 支付统计 ==========
+
+    def test_get_payment_statistics(self, payment_api):
+        """测试获取支付统计"""
+        response = payment_api.get_payment_statistics()
+        assert_status_code(response, 200)
+        data = response.json()
+        assert_response_has_fields(data["data"], [
+            "todayAmount", "todayCount", "totalAmount", "totalCount"
+        ])
+
+    def test_get_payment_statistics_by_date(self, payment_api):
+        """测试按日期获取支付统计"""
+        response = payment_api.get_payment_statistics(params={
+            "startDate": get_current_date(),
+            "endDate": get_current_date(),
+        })
+        assert_status_code(response, 200)
+
+    # ========== 支付渠道 ==========
+
+    def test_get_payment_channels(self, payment_api):
+        """测试获取支付渠道列表"""
+        response = payment_api.get_payment_channels()
+        assert_status_code(response, 200)
+        data = response.json()
+        assert isinstance(data["data"], list)
+        assert len(data["data"]) > 0
+
+    # ========== 支付验证 ==========
+
+    def test_verify_payment(self, payment_api):
+        """测试验证支付结果"""
+        create_resp = payment_api.create_payment({
+            "amount": 15.00,
+            "payMethod": "wechat",
+        })
+        assert_status_code(create_resp, 200)
+        payment_id = create_resp.json()["data"]["paymentId"]
+
+        response = payment_api.verify_payment(payment_id)
+        assert_status_code(response, 200)
+
+    # ========== 支付关闭 ==========
+
+    def test_close_payment(self, payment_api):
+        """测试关闭支付单"""
+        create_resp = payment_api.create_payment({
+            "amount": 25.00,
+            "payMethod": "wechat",
+        })
+        assert_status_code(create_resp, 200)
+        payment_id = create_resp.json()["data"]["paymentId"]
+
+        response = payment_api.close_payment(payment_id, "超时未支付")
+        assert_status_code(response, 200)
+
     # ========== 日结算 ==========
 
     def test_get_daily_settlement(self, payment_api, store_id):
@@ -178,3 +274,48 @@ class TestPayment:
         assert_response_has_fields(data["data"], [
             "totalAmount", "wechatAmount", "alipayAmount", "cashAmount", "orderCount"
         ])
+
+    # ========== 边界测试 ==========
+
+    def test_create_payment_decimal_amount(self, payment_api):
+        """测试小数金额支付"""
+        response = payment_api.create_payment({
+            "amount": 9.99,
+            "payMethod": "wechat",
+        })
+        assert_status_code(response, 200)
+
+    def test_create_payment_large_amount(self, payment_api):
+        """测试大额支付"""
+        response = payment_api.create_payment({
+            "amount": 99999.99,
+            "payMethod": "wechat",
+        })
+        # 大额支付可能需要额外验证
+        assert response.status_code in [200, 400]
+
+    def test_refund_zero_amount(self, payment_api):
+        """测试0元退款"""
+        create_resp = payment_api.create_payment({
+            "amount": 10.00,
+            "payMethod": "wechat",
+        })
+        assert_status_code(create_resp, 200)
+        payment_id = create_resp.json()["data"]["paymentId"]
+
+        response = payment_api.refund(payment_id, 0, "测试0元退款")
+        data = response.json()
+        assert data.get("code") != 0, "0元退款应失败"
+
+    def test_refund_negative_amount(self, payment_api):
+        """测试负数退款"""
+        create_resp = payment_api.create_payment({
+            "amount": 10.00,
+            "payMethod": "wechat",
+        })
+        assert_status_code(create_resp, 200)
+        payment_id = create_resp.json()["data"]["paymentId"]
+
+        response = payment_api.refund(payment_id, -5.00, "测试负数退款")
+        data = response.json()
+        assert data.get("code") != 0, "负数退款应失败"
