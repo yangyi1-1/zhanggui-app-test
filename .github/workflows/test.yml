@@ -1,0 +1,58 @@
+name: API自动化测试
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # 每天早上9点运行一次
+    - cron: '0 1 * * *'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+
+    - name: 设置 Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: 安装依赖
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: 运行冒烟测试
+      if: github.event_name == 'push'
+      run: |
+        pytest -m smoke -v --html=reports/smoke-report.html --self-contained-html
+      env:
+        TEST_ENV: test
+        TEST_ADMIN_PHONE: ${{ secrets.TEST_ADMIN_PHONE }}
+        TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD }}
+
+    - name: 运行全量测试
+      if: github.event_name == 'pull_request' || github.event_name == 'schedule'
+      run: |
+        pytest -v --html=reports/full-report.html --self-contained-html
+      env:
+        TEST_ENV: test
+        TEST_ADMIN_PHONE: ${{ secrets.TEST_ADMIN_PHONE }}
+        TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD }}
+
+    - name: 上传测试报告
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-report
+        path: reports/*.html
+
+    - name: 发送通知
+      if: failure()
+      run: |
+        echo "测试失败，请检查报告"
