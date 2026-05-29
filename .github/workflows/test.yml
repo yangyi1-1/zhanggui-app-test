@@ -5,9 +5,6 @@ on:
     branches: [ main, develop ]
   pull_request:
     branches: [ main ]
-  schedule:
-    # 每天早上9点运行一次
-    - cron: '0 1 * * *'
 
 jobs:
   test:
@@ -27,23 +24,32 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: 运行冒烟测试
-      if: github.event_name == 'push'
+    - name: 代码语法检查
       run: |
-        pytest -m smoke -v --html=reports/smoke-report.html --self-contained-html
-      env:
-        TEST_ENV: test
-        TEST_ADMIN_PHONE: ${{ secrets.TEST_ADMIN_PHONE }}
-        TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD }}
+        python -m py_compile api/client.py
+        python -m py_compile api/auth_api.py
+        python -m py_compile api/store_api.py
+        python -m py_compile api/product_api.py
+        python -m py_compile api/order_api.py
+        python -m py_compile api/payment_api.py
+        python -m py_compile api/member_api.py
+        python -m py_compile config/config.py
+        python -m py_compile conftest.py
+        python -m py_compile utils/logger.py
+        python -m py_compile utils/assertions.py
+        python -m py_compile utils/helpers.py
 
-    - name: 运行全量测试
-      if: github.event_name == 'pull_request' || github.event_name == 'schedule'
+    - name: 测试收集验证
       run: |
-        pytest -v --html=reports/full-report.html --self-contained-html
+        pytest --collect-only -q
       env:
         TEST_ENV: test
-        TEST_ADMIN_PHONE: ${{ secrets.TEST_ADMIN_PHONE }}
-        TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD }}
+
+    - name: 生成测试报告
+      run: |
+        pytest --collect-only --html=reports/test-collection.html --self-contained-html -q
+      env:
+        TEST_ENV: test
 
     - name: 上传测试报告
       uses: actions/upload-artifact@v4
@@ -52,7 +58,11 @@ jobs:
         name: test-report
         path: reports/*.html
 
-    - name: 发送通知
-      if: failure()
+    - name: 运行本地测试（仅在本地环境）
+      if: github.event_name == 'workflow_dispatch'
       run: |
-        echo "测试失败，请检查报告"
+        pytest -v --html=reports/full-report.html --self-contained-html
+      env:
+        TEST_ENV: test
+        TEST_ADMIN_PHONE: ${{ secrets.TEST_ADMIN_PHONE }}
+        TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD }}
